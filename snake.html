@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+  </head>
+
+  <body>
+    <style>
+      .container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 90vh;
+      }
+      .canvas_container {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+      }
+      .score_container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
+      .score {
+        text-align: center;
+        width: 150px;
+        border: 1px solid black;
+        border-radius: 5px;
+        margin-left: 5px;
+        padding: 5px;
+        margin-bottom: 10px;
+        font-weight: bold;
+        font-size: 20px;
+      }
+      .canvas {
+        position: relative;
+        height: 300px;
+        width: 300px;
+        border: 5px solid black;
+      }
+    </style>
+    <div class="container">
+      <div class="canvas_container">
+        <div class="score_container">
+          <div class="score increment_score">Score: 0</div>
+          <div class="score max_score">Max Score: 0</div>
+        </div>
+        <div class="canvas"></div>
+      </div>
+    </div>
+    <script>
+      const canvas = document.querySelector(".canvas");
+
+      const ROWS = 30;
+      const COLS = 30;
+      const PIXEL = 10;
+      let currentFoodKey;
+      let currentSnakeKeys;
+      let maxScore = localStorage.getItem("maxScore");
+      let snakeSpeed = 100;
+      let incrementSnakeSpeed = 10;
+      let increment = 0;
+      let currentSnake = [
+        [0, 0],
+        [0, 1],
+        [0, 2],
+      ];
+
+      const maxScoreHTML = (document.querySelector(
+        ".max_score"
+      ).innerHTML = `Max Score: ${maxScore}`);
+
+      const canvasPositions = new Map();
+
+      function toKey(cell) {
+        return cell[0] + "_" + cell[1];
+      }
+
+      function initializedCanvas() {
+        for (let i = 0; i < ROWS; i++) {
+          for (let j = 0; j < COLS; j++) {
+            const pixel = document.createElement("div");
+            pixel.style.position = "absolute";
+            pixel.style.top = PIXEL * i + "px";
+            pixel.style.left = PIXEL * j + "px";
+            pixel.style.border = "1px solid #aaa";
+            pixel.style.height = PIXEL + "px";
+            pixel.style.width = PIXEL + "px";
+            canvas.appendChild(pixel);
+            keys = toKey([i, j]);
+            canvasPositions.set(keys, pixel);
+          }
+        }
+      }
+      initializedCanvas();
+
+      function drawSnake(snake) {
+        const snakeKeys = new Set();
+        for (const cell of snake) {
+          const position = toKey(cell);
+          snakeKeys.add(position);
+        }
+        return snakeKeys;
+      }
+
+      function drawCanvas() {
+        for (let i = 0; i < ROWS; i++) {
+          for (let j = 0; j < COLS; j++) {
+            const key = toKey([i, j]);
+            const pixel = canvasPositions.get(key);
+            let background = "white";
+            if (key === currentFoodKey) {
+              background = "purple";
+            } else if (currentSnakeKeys.has(key)) {
+              background = "black";
+            }
+            pixel.style.background = background;
+          }
+        }
+      }
+
+      const moveRight = ([top, left]) => [top, left + 1];
+      const moveLeft = ([top, left]) => [top, left - 1];
+      const moveUp = ([top, left]) => [top - 1, left];
+      const moveDown = ([top, left]) => [top + 1, left];
+
+      let currentDirection = moveRight;
+
+      let directionQueue = [];
+
+      window.addEventListener("keydown", (e) => {
+        switch (e.key) {
+          case "w":
+            directionQueue.push(moveUp);
+            break;
+          case "s":
+            directionQueue.push(moveDown);
+            break;
+          case "a":
+            directionQueue.push(moveLeft);
+            break;
+          case "d":
+            directionQueue.push(moveRight);
+            break;
+          case "r":
+            window.location.reload(true);
+            break;
+        }
+      });
+
+      function step() {
+        const head = currentSnake[currentSnake.length - 1];
+        let nextDirection = currentDirection;
+        while (directionQueue.length > 0) {
+          let candidateDirection = directionQueue.shift();
+          if (!areOpposite(candidateDirection, currentDirection))
+            nextDirection = candidateDirection;
+          break;
+        }
+
+        currentDirection = nextDirection;
+
+        const pushHead = currentDirection(head);
+        if (checkValid(pushHead, currentSnake)) currentSnake.push(pushHead);
+        else {
+          gameStop(false);
+          return;
+        }
+
+        if (currentSnakeKeys.has(currentFoodKey)) {
+          increment++;
+          if (snakeSpeed > 0) snakeSpeed -= incrementSnakeSpeed;
+          let nextFoodKey = getFood();
+          incrementScore(increment);
+
+          if (nextFoodKey === null) {
+            stopGame(true);
+            return;
+          }
+          currentFoodKey = nextFoodKey;
+        } else {
+          let tail = currentSnake.shift();
+        }
+
+        drawCanvas();
+      }
+
+      function incrementScore(increment) {
+        const score = (document.querySelector(
+          ".increment_score"
+        ).innerHTML = `Score: ${increment}`);
+      }
+
+      function checkValid(pushHead, currentSnake) {
+        let [top, left] = pushHead;
+        let snakeKeys = drawSnake(currentSnake);
+
+        if (top < 0 || left < 0) return false;
+        if (top >= ROWS || left >= COLS) return false;
+        if (snakeKeys.has(toKey(pushHead))) return false;
+
+        return true;
+      }
+      function areOpposite(candidateDirection, currentDirection) {
+        if (candidateDirection === moveDown && currentDirection === moveUp)
+          return true;
+        if (candidateDirection === moveUp && currentDirection === moveDown)
+          return true;
+        if (candidateDirection === moveRight && currentDirection === moveLeft)
+          return true;
+        if (candidateDirection === moveLeft && currentDirection === moveRight)
+          return true;
+
+        return false;
+      }
+
+      function getFood() {
+        const row = Math.floor(Math.random() * ROWS);
+        const col = Math.floor(Math.random() * COLS);
+        const foodKeys = toKey([row, col]);
+        return foodKeys;
+      }
+      currentFoodKey = getFood();
+
+      function gameStop() {
+        canvas.style.borderColor = "red";
+
+        if (maxScore < increment) {
+          maxScore = increment;
+          localStorage.setItem("maxScore", maxScore);
+          const maxScoreHTML = (document.querySelector(
+            ".max_score"
+          ).innerHTML = `Max Score: ${maxScore}`);
+        }
+        setTimeout(() => {
+          clearTimeout(timer);
+        }, 100);
+      }
+
+      let timer;
+
+      function snakeSpeedInterval() {
+        currentSnakeKeys = drawSnake(currentSnake);
+        drawCanvas();
+        step();
+        timer = setTimeout(snakeSpeedInterval, snakeSpeed);
+      }
+      timer = setTimeout(snakeSpeedInterval, snakeSpeed);
+
+      // function startGame() {
+      //   directionQueue = [];
+      //   currentDirection = moveRight;
+      //   currentSnake = initialSnakePosition();
+      //   canvas.style.borderColor = "";
+      //   currentFoodKey = getFood();
+      //   currentSnakeKeys = drawSnake(currentSnake);
+
+      //   function snakeSpeedInterval() {
+      //     currentSnakeKeys = drawSnake(currentSnake);
+      //     drawCanvas();
+      //     step();
+      //     setTimeout(snakeSpeedInterval, snakeSpeed);
+      //   }
+      //   setTimeout(snakeSpeedInterval, snakeSpeed);
+      // }
+
+      // startGame();
+    </script>
+  </body>
+</html>
